@@ -1,0 +1,12 @@
+function zsh-ssh-tmux () {
+  local selected_host=$(grep "Host " ~/.ssh/config | \grep -v '*' | cut -b 6- | awk '{print $1}' | fzf-tmux -p --reverse -1 -0 +m +s --query "$LBUFFER" --prompt="SSH Host > ")
+
+  if [ -n "$selected_host" ]; then
+    BUFFER="tmux new-window -n ssh-${selected_host} 'ssh ${selected_host}'"
+    zle accept-line
+  fi
+  zle reset-prompt
+}
+
+zle -N zsh-ssh-tmux
+bindkey '^n' zsh-ssh-tmux
