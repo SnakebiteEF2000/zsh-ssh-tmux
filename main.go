@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,8 +27,15 @@ type Host struct {
 }
 
 func main() {
-	inventoryPath := "hosts.yml"
-	inventoryData, err := os.ReadFile(inventoryPath)
+	inventoryPath := flag.String("inventory", "hosts.yml", "Path to the inventory file")
+	sshUser := flag.String("user", "", "SSH user for non-DMZ hosts")
+	flag.Parse()
+
+	if flag.NArg() > 0 {
+		*inventoryPath = flag.Arg(0)
+	}
+
+	inventoryData, err := os.ReadFile(*inventoryPath)
 	if err != nil {
 		fmt.Printf("Error reading inventory file: %v\n", err)
 		return
@@ -40,9 +48,10 @@ func main() {
 		return
 	}
 
-	fmt.Print("Enter your admin user used for SSH on non DMZ-Hosts: ")
-	var sshUser string
-	fmt.Scanln(&sshUser)
+	if *sshUser == "" {
+		fmt.Print("Enter your admin user used for SSH on non DMZ-Hosts: ")
+		fmt.Scanln(sshUser)
+	}
 
 	var sshConfig strings.Builder
 	sshConfig.WriteString("# SSH Config generated from inventory\n\n")
@@ -50,7 +59,7 @@ func main() {
 	for groupName, group := range inventory.All.Children {
 		fmt.Printf("Processing group: %s\n", groupName)
 		for hostname, hostData := range group.Hosts {
-			writeHostConfig(&sshConfig, hostname, hostData, sshUser, groupName)
+			writeHostConfig(&sshConfig, hostname, hostData, *sshUser, groupName)
 		}
 	}
 
