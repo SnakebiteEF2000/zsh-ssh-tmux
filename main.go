@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
 	"gopkg.in/yaml.v2"
 )
 
@@ -28,7 +27,9 @@ type Host struct {
 
 func main() {
 	inventoryPath := flag.String("inventory", "hosts.yml", "Path to the inventory file")
-	sshUser := flag.String("user", "", "SSH user for non-DMZ hosts")
+	sshUser := flag.String("user", "", "SSH user for hosts")
+	altsshUser := flag.String("altuser", "", "Alternative user for connects")
+	altsshUserRegex := flag.String("altuserregex", "", "Use Match Host <altuserregex> for user matching. See man ssh_config.")
 	flag.Parse()
 
 	if flag.NArg() > 0 {
@@ -54,20 +55,29 @@ func main() {
 	}
 
 	var sshConfig strings.Builder
-	sshConfig.WriteString("# SSH Config generated from inventory\n\n")
 
-	for groupName, group := range inventory.All.Children {
+	sshConfig.WriteString("# SSH Config generated from inventory\n\n")
+	if *altsshUserRegex != "" && *altsshUser != "" {
+		sshConfig.WriteString(fmt.Sprintf("Match Host %s\n", *altsshUserRegex))
+		sshConfig.WriteString(fmt.Sprintf("  User %s\n\n", *altsshUser))
+	}
+
+	sshConfig.WriteString(fmt.Sprintf("Match Host *\n"))
+	sshConfig.WriteString(fmt.Sprintf("  User %s\n\n", *sshUser))
+
+	for groupName, hosts := range inventory.All.Children {
 		fmt.Printf("Processing group: %s\n", groupName)
-		for hostname, hostData := range group.Hosts {
-			writeHostConfig(&sshConfig, hostname, hostData, *sshUser, groupName)
-		}
+		for hostname, hostData := range hosts.Hosts {
+			if len(hostData.AnsibleHost) > 1 {
+				writeHostConfig(&sshConfig, hostname, hostData, groupName)
+			}
+		}	
 	}
 
 	fmt.Println("Generated SSH config:")
-	fmt.Println(sshConfig.String())
 
 	homeDir, _ := os.UserHomeDir()
-	sshConfigPath := filepath.Join(homeDir, ".ssh", "config")
+	sshConfigPath := filepath.Join(homeDir, ".ssh", "ansible-inventory")
 	err = os.WriteFile(sshConfigPath, []byte(sshConfig.String()), 0600)
 	if err != nil {
 		fmt.Printf("Error writing SSH config file: %v\n", err)
@@ -77,30 +87,17 @@ func main() {
 	fmt.Printf("SSH config file generated at: %s\n", sshConfigPath)
 }
 
-func writeHostConfig(sshConfig *strings.Builder, hostname string, hostData Host, sshUser, groupName string) {
+func writeHostConfig(sshConfig *strings.Builder, hostname string, hostData Host, groupName string) {
 	description := getDescription(hostData, groupName)
+
 	sshConfig.WriteString(fmt.Sprintf("Host %s %s\n", hostname, description))
 	sshConfig.WriteString(fmt.Sprintf("  HostName %s\n", getHostname(hostData.AnsibleHost, hostname)))
 
-	if strings.Contains(strings.ToLower(hostname), "dmz") {
-		sshConfig.WriteString("  User dummy\n")
-	} else {
-		sshConfig.WriteString(fmt.Sprintf("  User %s\n", sshUser))
-	}
-
-	sshConfig.WriteString("  IdentityFile ~/.ssh/id_rsa\n")
-	sshConfig.WriteString("  AddKeysToAgent yes\n")
-	sshConfig.WriteString("  SendEnv LANG LC_*\n")
-	sshConfig.WriteString("  HashKnownHosts yes\n")
-	sshConfig.WriteString("  GSSAPIAuthentication yes\n")
-	sshConfig.WriteString("  GSSAPIDelegateCredentials no\n")
 	sshConfig.WriteString("\n")
 }
 
 func getDescription(hostData Host, groupName string) string {
 	var description strings.Builder
-	description.WriteString(groupName)
-
 	if role, ok := hostData.CustomFields["HW_role_services_description"].(string); ok && role != "" {
 		description.WriteString(fmt.Sprintf(" %s", role))
 	}
