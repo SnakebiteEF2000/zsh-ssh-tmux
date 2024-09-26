@@ -1,13 +1,14 @@
-# zsh-ssh-tmux
-
-depends on tmux, zsh and fzf
-
-source in .zshrc
+# generate ssh config from ansible inventory *fast*
 
 ~~~
 go build -o ssh-conf-gen main.go
+mv ssh-conf-get ~/.local/bin/
 ~~~
 
 ~~~
-./ssh-conf-gen -inventory /path/to/inventory.yml -user <user used for ssh>
+# default setting
+ssh-conf-gen -inventory <ansible inventory.yml> -user <default ssh user>
+
+# use alternative user
+ssh-conf-gen -inventory <ansible inventory.yml> -user <default ssh user> -altuser <alternative ssh user> -altuserregex <use regex>
 ~~~
