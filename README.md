@@ -12,3 +12,6 @@ ssh-conf-gen -inventory <ansible inventory.yml> -user <default ssh user>
 # use alternative user
 ssh-conf-gen -inventory <ansible inventory.yml> -user <default ssh user> -altuser <alternative ssh user> -altuserregex <use regex>
 ~~~
+# zsh-ssh-tmux
+
+depends on tmux, zsh and fzf
